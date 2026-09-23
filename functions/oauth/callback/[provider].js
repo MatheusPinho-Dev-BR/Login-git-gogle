@@ -13,8 +13,9 @@ export async function onRequestGet(context) {
     return new Response('Parâmetros inválidos ou erro no provedor', { status: 400 });
   }
 
+  // Leitura robusta do cookie (ignora espaços extras)
   const cookieHeader = context.request.headers.get('Cookie') || '';
-  const cookies = Object.fromEntries(cookieHeader.split('; ').map(c => c.split('=')));
+  const cookies = Object.fromEntries(cookieHeader.split(';').filter(c => c).map(c => c.trim().split('=')));
   const txId = cookies['Host-oauth-tx'];
 
   if (!txId) {
@@ -24,6 +25,7 @@ export async function onRequestGet(context) {
   const db = context.env.DB;
   const encoder = new TextEncoder();
 
+  // Calcular resumos para busca no D1
   const digestTx = await crypto.subtle.digest('SHA-256', encoder.encode(txId));
   const txIdHash = btoa(String.fromCharCode(...new Uint8Array(digestTx)))
     .replace(/\+/g, '-')
@@ -36,10 +38,12 @@ export async function onRequestGet(context) {
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
+  // Buscar transação no banco
   const tx = await db.prepare(
     `SELECT * FROM oauth_transactions WHERE id_hash = ? AND provider = ?`
   ).bind(txIdHash, providerName).first();
 
+  // Apagar transação imediatamente (evitar reutilização)
   await db.prepare(`DELETE FROM oauth_transactions WHERE id_hash = ?`).bind(txIdHash).run();
 
   if (!tx || tx.expires_at < Math.floor(Date.now() / 1000) || tx.state_hash !== stateHash) {
@@ -54,6 +58,7 @@ export async function onRequestGet(context) {
   let displayName = '';
 
   if (providerName === 'google') {
+    // Trocar código por tokens no Google
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -72,6 +77,7 @@ export async function onRequestGet(context) {
       return new Response('Falha na troca de tokens do Google', { status: 400 });
     }
 
+    // Validação básica e decodificação do JWT (id_token) do Google
     const parts = tokenData.id_token.split('.');
     if (parts.length !== 3) return new Response('JWT inválido', { status: 400 });
     
@@ -95,6 +101,7 @@ export async function onRequestGet(context) {
     displayName = payload.name || payload.email;
 
   } else {
+    // Trocar código por tokens no GitHub
     const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
@@ -117,11 +124,12 @@ export async function onRequestGet(context) {
 
     const accessToken = tokenData.access_token;
 
+    // Consultar o perfil do usuário no GitHub
     const userRes = await fetch('https://api.github.com/user', {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2026-03-10',
+        'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'Cloudflare-Pages-Lab'
       }
     });
@@ -134,13 +142,14 @@ export async function onRequestGet(context) {
     displayName = userData.name || userData.login;
     email = userData.email || null;
 
+    // Revogar imediatamente o token de acesso da OAuth App
     const basicAuth = btoa(`${context.env.GITHUB_CLIENT_ID}:${context.env.GITHUB_CLIENT_SECRET}`);
     await fetch(`https://api.github.com/applications/${context.env.GITHUB_CLIENT_ID}/grant`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Basic ${basicAuth}`,
         'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2026-03-10',
+        'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json',
         'User-Agent': 'Cloudflare-Pages-Lab'
       },
@@ -158,6 +167,7 @@ export async function onRequestGet(context) {
       .replace(/=+$/, '');
   };
 
+  // Criar sessão opaca local no D1
   const sessionId = generateRandomBase64URL();
   const digestSession = await crypto.subtle.digest('SHA-256', encoder.encode(sessionId));
   const sessionIdHash = btoa(String.fromCharCode(...new Uint8Array(digestSession)))
@@ -166,20 +176,20 @@ export async function onRequestGet(context) {
     .replace(/=+$/, '');
 
   const now = Math.floor(Date.now() / 1000);
-  const sessionExpiresAt = now + 28800;
+  const sessionExpiresAt = now + 28800; // 8 horas
 
   await db.prepare(
     `INSERT INTO sessions (id_hash, issuer, subject, email, display_name, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(sessionIdHash, issuer, subject, email, displayName, sessionExpiresAt, now).run();
 
+  // Configuração correta de Headers para enviar múltiplos cookies
+  const headers = new Headers();
+  headers.set('Location', baseUrl);
+  headers.append('Set-Cookie', `Host-oauth-tx=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+  headers.append('Set-Cookie', `Host-session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`);
+
   return new Response(null, {
     status: 302,
-    headers: {
-      'Location': baseUrl,
-      'Set-Cookie': [
-        `Host-oauth-tx=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
-        `Host-session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800`
-      ]
-    }
+    headers: headers
   });
 }
