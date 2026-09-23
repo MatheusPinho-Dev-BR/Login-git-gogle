@@ -1,6 +1,6 @@
 export async function onRequestGet(context) {
-  const cookieHeader = context.request.headers.get('Cookie') || '';
-  const cookies = Object.fromEntries(cookieHeader.split('; ').map(c => c.split('=')));
+ const cookieHeader = context.request.headers.get('Cookie') || '';
+  const cookies = Object.fromEntries(cookieHeader.split(';').map(c => c.trim().split('=')));
   const sessionId = cookies['Host-session'];
 
   if (!sessionId) {
