@@ -1,14 +1,37 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
- <head>
- <meta charset="utf-8">
- <meta name="viewport" content="width=device-width, initial-scale=1">
- <title>Laboratório de autenticação</title>
- </head>
- <body>
- <main>
- <h1>Laboratório de autenticação</h1>
- <p id="status">A sessão ainda não foi consultada.</p>
- </main>
- </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratório de Autenticação</title>
+    <!-- Você pode linkar o seu styles.css aqui se tiver um -->
+</head>
+<body>
+    <h1>Laboratório de autenticação</h1>
+    
+    <!-- Mensagem inicial exigida pelo laboratório -->
+    <p id="status-mensagem">A sessão ainda não foi consultada.</p>
+
+    <!-- Área mostrada quando o usuário NÃO está logado -->
+    <div id="area-login" style="display: none;">
+        <h2>Entrar</h2>
+        <!-- Os links apontam diretamente para as nossas Pages Functions -->
+        <a href="/oauth/login/google"><button>Entrar com o Google</button></a>
+        <br><br>
+        <a href="/oauth/login/github"><button>Entrar com o GitHub</button></a>
+    </div>
+
+    <!-- Área mostrada quando o usuário ESTÁ logado -->
+    <div id="area-logado" style="display: none;">
+        <h2>Bem-vindo(a)!</h2>
+        <p><strong>Nome:</strong> <span id="user-nome"></span></p>
+        <p><strong>Email:</strong> <span id="user-email"></span></p>
+        <p><strong>Provedor:</strong> <span id="user-provedor"></span></p>
+        <br>
+        <button id="btn-logout">Sair (Logout)</button>
+    </div>
+
+    <!-- Importando a lógica do frontend -->
+    <script src="/app.js"></script>
+</body>
 </html>
