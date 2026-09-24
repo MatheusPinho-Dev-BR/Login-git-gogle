@@ -1,0 +1,2 @@
+Homepage URL: https://login-git-gogle.pages.dev
+Authorization callback URL: https://login-git-gogle.pages.dev/oauth/callback/github
