@@ -1,0 +1,1 @@
+https://login-git-gogle.pages.dev/oauth/callback/google
