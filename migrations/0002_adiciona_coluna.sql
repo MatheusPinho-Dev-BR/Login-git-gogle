@@ -1,1 +1,1 @@
-ALTER TABLE notas ADD COLUMN nota REAL
+   ALTER TABLE notas ADD COLUMN nota REAL;
