@@ -1,0 +1,8 @@
+  name = "login-git-gogle"
+  compatibility_date = "2026-10-01"
+  pages_build_output_dir = "public"
+
+  [[d1_databases]]
+  binding = "DB"
+  database_name = "login-git-gogle"
+  database_id = "aa6529d5-df95-428e-b5b6-c6e808cd01c3"
